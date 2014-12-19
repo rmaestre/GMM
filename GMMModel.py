@@ -1,27 +1,7 @@
-#
-# Copyright 2014 Flytxt
-#
-# Licensed to the Apache Software Foundation (ASF) under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.
-# The ASF licenses this file to You under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
 
-import numpy as np
-from pyspark import SparkContext
+# Set the path for spark installation
 from GMMclustering import GMMclustering
-from pyspark.mllib.linalg import Vectors, SparseVector
-
+import numpy as np
 
 class GMMModel(object):
     """
@@ -78,16 +58,3 @@ class GMMModel(object):
         cluster_labels = responsibility_matrix.map(lambda b: np.argmax(b))
         return responsibility_matrix, cluster_labels
 
-
-def _test():
-    import doctest
-    globs = globals().copy()
-    globs['sc'] = SparkContext('local[4]', 'PythonTest', batchSize=2)
-    (failure_count, test_count) = doctest.testmod(globs=globs, optionflags=doctest.ELLIPSIS)
-    globs['sc'].stop()
-    if failure_count:
-        exit(-1)
-
-
-if __name__ == "__main__":
-    _test()

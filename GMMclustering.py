@@ -16,13 +16,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# Set the path for spark installation
+import sys
+import os
+import numpy as np
+
+os.environ['SPARK_HOME'] = "/opt/spark-1.1.0-bin-hadoop1"
+sys.path.append("/opt/spark-1.1.0-bin-hadoop1/python/lib/py4j-0.8.2.1-src.zip")
+sys.path.append("/opt/spark-1.1.0-bin-hadoop1/python")
+
 
 import logging
 import numpy as np
 from operator import add
 from scipy.misc import logsumexp
-from pyspark.mllib.linalg import Vectors
-from pyspark.mllib.clustering import KMeans
+
+# Import Spark Modules
+try:
+    from pyspark.mllib.linalg import Vectors
+    from pyspark.mllib.clustering import KMeans
+
+except ImportError as e:
+    print ("Error importing Spark Modules", e)
+    sys.exit(1)
 
 
 class GMMclustering:

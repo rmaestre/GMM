@@ -1,73 +1,78 @@
-#
-# Copyright 2014 Flytxt
-#
-# Licensed to the Apache Software Foundation (ASF) under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.
-# The ASF licenses this file to You under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+#!/opt/spark-1.1.0-bin-hadoop1/bin/pyspark --executor-memory 8G
+__author__ = 'roberto'
 
-"""
-Gaussian Mixture Model
-This implementation of GMM in pyspark uses the  Expectation-Maximization algorithm
-to estimate the parameters.
-"""
 import sys
-import argparse
+import os
 import numpy as np
+from math import sqrt
+import csv
+import argparse
 from GMMModel import GMMModel
-from pyspark import SparkContext, SparkConf
+
+# Global variables
+IX_INPUT_FILENAME = "/tmp/bivariate.csv"  # File input
+IX_SEPARATOR = ","  # Input line separator
+IX_RANGE_TO_CLUSTER = (0, 1)  # Matrix column to be clusterized
+IX_FORECAST_VALUE = IX_RANGE_TO_CLUSTER[1] + 0  # Forecast value of each vector
+
+
+# Set the path for spark installation
+os.environ['SPARK_HOME'] = "/opt/spark-1.1.0-bin-hadoop1"
+sys.path.append("/opt/spark-1.1.0-bin-hadoop1/python/lib/py4j-0.8.2.1-src.zip")
+sys.path.append("/opt/spark-1.1.0-bin-hadoop1/python")
+
+# Import Spark Modules
+try:
+    from pyspark import SparkContext
+    from pyspark import SparkConf
+    from pyspark.mllib.clustering import KMeans
+
+
+except ImportError as e:
+    print ("Error importing Spark Modules", e)
+    sys.exit(1)
 
 
 def parseVector(line):
     return np.array([float(x) for x in line.split(',')])
 
-if __name__ == "__main__":
-    """
-    Parameters
-    ----------
-    input_file : path of the file which contains the comma separated integer data points
-    n_components : Number of mixture components
-    n_iter : Number of EM iterations to perform. Default to 100
-    ct : convergence_threshold.Default to 1e-3
-    """
-    conf = SparkConf().setAppName("GMM")
-    sc = SparkContext(conf=conf)
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('input_file', help='input file')
-    parser.add_argument('n_components', type=int, help='num_of_clusters')
-    parser.add_argument('--n_iter', default=100, type=int, help='num_of_iterations')
-    parser.add_argument('--ct', type=float, default=1e-3, help='convergence_threshold')
-    args = parser.parse_args()
+# Setup Spark configuration
+conf = SparkConf()
+conf.setMaster("local[%s]" % 4)
+# conf.setMaster("local")
+conf.setAppName("Spark K-Means")
+# conf.set("spark.executor.memory", "10g")
+#conf.set("spark.eventLog.enabled", "true")
+#conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+sc = SparkContext(conf=conf)
 
-    input_file = args.input_file
-    lines = sc.textFile(input_file)
-    data = lines.map(parseVector).cache()
+"""
+Parameters
+----------
+input_file : path of the file which contains the comma separated integer data points
+n_components : Number of mixture components
+n_iter : Number of EM iterations to perform. Default to 100
+ct : convergence_threshold.Default to 1e-3
+"""
 
-    model = GMMModel.trainGMM(data, args.n_components, args.n_iter, args.ct)
-    responsibility_matrix, cluster_labels = GMMModel.resultPredict(model, data)
+input_file = IX_INPUT_FILENAME
+lines = sc.textFile(input_file)
+data = lines.map(parseVector).cache()
 
-    # Writing the GMM components to files
-    means_file = input_file.split(".")[0]+"/means"
-    sc.parallelize(model.Means, 1).saveAsTextFile(means_file)
+model = GMMModel.trainGMM(data, 2, 100, 10)
+responsibility_matrix, cluster_labels = GMMModel.resultPredict(model, data)
 
-    covar_file = input_file.split(".")[0]+"/covars"
-    sc.parallelize(model.Covars, 1).saveAsTextFile(covar_file)
+# Writing the GMM components to files
+means_file = input_file.split(".")[0] + "/tmp/means"
+sc.parallelize(model.Means, 1).saveAsTextFile(means_file)
 
-    responsbilities = input_file.split(".")[0]+"/responsbilities"
-    responsibility_matrix.coalesce(1).saveAsTextFile(responsbilities)
+covar_file = input_file.split(".")[0] + "/tmp/covars"
+sc.parallelize(model.Covars, 1).saveAsTextFile(covar_file)
 
-    cluster_file = input_file.split(".")[0]+"/clusters"
-    cluster_labels.coalesce(1).saveAsTextFile(cluster_file)
-    sc.stop()
+responsbilities = input_file.split(".")[0] + "/tmp/responsbilities"
+responsibility_matrix.coalesce(1).saveAsTextFile(responsbilities)
+
+cluster_file = input_file.split(".")[0] + "/tmp/clusters"
+cluster_labels.coalesce(1).saveAsTextFile(cluster_file)
+sc.stop()
